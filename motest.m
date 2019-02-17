@@ -408,7 +408,7 @@ for i = testid
   Vne = int_attraction(testdata(i).atoms,testdata(i).xyz_a0,basis);
   
   Vne_ref = testout(i).Vne;
-  abserr = (Vne(:)-Vne_ref(:));
+  abserr = abs(Vne(:)-Vne_ref(:));
   maxabserr = max(abserr(:));
   ok = all(abserr(:)<threshold);
   
