@@ -1,4 +1,4 @@
-%% milestone 4 parts (c), (d), and (e)
+%% milestone 5 part (d)
 %  defines function mocalc
 
 % documentation (from stefan's notes):
@@ -13,6 +13,11 @@
 %  			.basisset string specifying the basis set, e.g. '6-31G', 'cc-pVDZ', 'STO-3G'
 %  			.tolEnergy SCF convergence tolerance for the energy (hartrees)
 %  			.tolDensity SCF convergence tolerance for the density (a_0^(-3))
+%			.method string specifying the method, either 'RHF' for restricted Hartree-Fock or 'RKS' for restricted Kohn-Sham DFT
+%			.ExchFunctional string specifying the exchange functional, 'Slater'
+%			.CorrFunctional string specifying the correlation functional, 'VWN3' or 'VWN5'
+%			.nRadialPoints number of radial points for the integration grid
+%			.nAngularPoints number of angular points for the integration grid
 % 
 %  Output:
 %  		out a structure that contains several fields:
@@ -27,6 +32,10 @@
 %  			.P density matrix (M×M)
 %  			.E0 electronic ground-state energy of the molecule, in hartrees
 %  			.Etot total ground-state energy (including nuclear-nuclear repulsion; but without the vibrational zero-point energy), in hartrees
+%			.Exc exchange-correlation energy, in hartrees
+%			.Vxc matrix of exchange-correlation integrals (MxM), in hartrees
+%			.rhoInt integral of electron density over all 3D space
+
 
 function out = mocalc(atoms, xyz_a0, totalcharge, settings)
 
@@ -45,7 +54,7 @@ function out = mocalc(atoms, xyz_a0, totalcharge, settings)
 			end
 		end
 	end
-	
+
 	% build the basis and record its length
 	basis = buildbasis(atoms, xyz_a0, basisread(settings.basisset));
 	nBasis = length(basis);
@@ -63,14 +72,24 @@ function out = mocalc(atoms, xyz_a0, totalcharge, settings)
 	% this way the first iteration of the loop below drops two-electron terms from the Fock matrix, as required
 	P = zeros(nBasis, nBasis);
 	epsilon = zeros(nBasis,nBasis);
+		
+	if settings.method == 'RKS'
+		grid = molecular_grid(atoms, xyz_a0, settings.nRadialPoints, settings.nAngularPoints);
+	end
 	
 	% this is the SCF loop; it iterates until the convergence criteria are met, whence the "break" statement below is executed to terminate the loop
 	while true
 		% calculate J and K using the current density matrix P and the (fixed) values of ERI and nBasis
 		[J K] = calculateJK(P, ERI, nBasis);
 
-		% calculate F using the new values for J and K
-		F = T + Vne + J - K;
+		% if we are doing DFT, compute exchange-correlation quantities and calculate F appropriately
+		if settings.method == 'RKS'
+			[Vxc Exc rhoInt] = int_xc(basis, P, grid, settings.ExchFunctional, settings.CorrFunctional);
+			F = T + Vne + J + Vxc;
+		% otherwise we are doing HF; calculate F using J and K
+		else
+			F = T + Vne + J - K;
+		end
 		
 		% solve the Roothan-Hall equations for the current F
 		[C epsilonNew] = eig(F,S);
@@ -100,16 +119,26 @@ function out = mocalc(atoms, xyz_a0, totalcharge, settings)
 		epsilon = epsilonNew;
 	end
 	
-	% populate the fields of the output structure
+	% populate the fields of the output structure	
 	out.basis = basis;
 	out.S = S;
 	out.T = T;
 	out.Vne = Vne;
-	out.Vee = J - K;
 	out.ERI = ERI;
 	out.epsilon = diag(epsilon);
 	out.C = C;
 	out.P = P;
-	out.E0 = sum(sum(transpose(P).*(T + Vne + (J - K)/2)));
+	
+	if settings.method == 'RKS'
+		out.E0 = sum(sum(transpose(P).*(T + Vne + J/2))) + Exc;
+		out.Vee = J;
+		out.Vxc = Vxc;
+		out.Exc = Exc;
+		out.rhoInt = rhoInt;
+	else
+		out.E0 = sum(sum(transpose(P).*(T + Vne + (J - K)/2)));
+		out.Vee = J - K;
+	end
+
 	out.Etot = out.E0 + nucnucrepulsion(atoms, xyz_a0);
 end
