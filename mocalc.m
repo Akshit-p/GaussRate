@@ -1,4 +1,5 @@
 %% milestone 5 part (d)
+%% (also milestone 4 parts (c)-(e))
 %  defines function mocalc
 
 % documentation (from stefan's notes):
@@ -25,7 +26,8 @@
 %  			.S overlap matrix (M×M)
 %  			.T kinetic energy matrix (M×M)
 %  			.Vne electron-nuclear attraction matrix (M×M)
-%  			.Vee electron-electron repulsion matrix (M×M) (Coulomb and exchange combined)
+%			.J matrix of Coulomb integrals (M×M)
+%			.K matrix of exchange integrals (M×M)
 %  			.ERI 4D array of electron-electron repulsion integrals (M×M×M×M)
 %  			.epsilon MO energies (1×M), in hartrees, in ascending order, occupied and virtual orbitals
 %  			.C MO coefficient matrix (M×M), of occupied and virtual orbitals, sorted in ascending order of orbital energy
@@ -128,16 +130,18 @@ function out = mocalc(atoms, xyz_a0, totalcharge, settings)
 	out.epsilon = diag(epsilon);
 	out.C = C;
 	out.P = P;
+	out.J = J;
+	out.K = K;
+
 	
 	if settings.method == 'RKS'
 		out.E0 = sum(sum(transpose(P).*(T + Vne + J/2))) + Exc;
-		out.Vee = J;
+		out.K = zeros(nBasis, nBasis);		
 		out.Vxc = Vxc;
 		out.Exc = Exc;
 		out.rhoInt = rhoInt;
 	else
 		out.E0 = sum(sum(transpose(P).*(T + Vne + (J - K)/2)));
-		out.Vee = J - K;
 	end
 
 	out.Etot = out.E0 + nucnucrepulsion(atoms, xyz_a0);
