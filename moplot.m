@@ -1,5 +1,5 @@
-%% milestone 5 part c
-%  defines function int_xc
+%% milestone 6
+%  defines function moplot
 %
 % documentation (from stefan's notes)
 %
