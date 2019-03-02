@@ -13,7 +13,8 @@
 %         (a_0^(-3/2)) 
 %     Output:
 %         A 3D isosurface plot of the MO with ± isolevel (blue +ve, red -ve), including
-%         positions of the atoms distinguished by color [H: "cyan", He: "magenta", Be: "green", C: "black", O: "yellow"]
+%         positions of the atoms distinguished by color [H: "cyan", He:
+%         "magenta", Be: "green", C: "black", O: "yellow", everything else gray]
 
 function moplot(atoms, xyz_a0, out, iMO, level)
 
