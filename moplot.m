@@ -5,22 +5,39 @@
 %
 % moplot(atoms,xyz_a0,out,iMO,level)
 %     Input:
-%         atoms list of element numbers (1×K array); e.g. [6 8] for CO
+%         atoms list of element numbers (1xK array); e.g. [6 8] for CO
 %         xyz_a0 coordinates of the nuclei in the molecule, in bohr
 %         out output structure as returned from the mocalc function
 %         iMO index of MO to plot (iMO = 1 for lowest-energy MO, etc. in ascending-energy order)
-%         level contour level for the isosurface, in bohr-based units (??0?3/2)
+%         level contour level for the isosurface, in bohr-based units
+%         (a_0^(-3/2)) 
 %     Output:
-%         A 3D isosurface plot of the MO, including positions of the atoms
+%         A 3D isosurface plot of the MO with ± isolevel (blue +ve, red -ve), including
+%         positions of the atoms distinguished by color [H: "cyan", He: "magenta", Be: "green", C: "black", O: "yellow"]
 
 function moplot(atoms, xyz_a0, out, iMO, level)
 
+    color.list = ["cyan", "magenta", "green", "black", "yellow"];
+	color.indices = [1, 2, 4, 6, 8];
+    
     MOcoeffs = out.C(:,iMO);
     
-    % guess for the box for the isosurface plot 
-    nmesh = 101;
-	pts = linspace(-2.5, 2.5, nmesh);
-	[X, Y, Z] = meshgrid(pts);
+    % array of [min, max] rows being x, y,z
+    sz = zeros(3, 2);
+    % produce the approximate box to evaluate
+    for i = 1:3
+        pmin = min(xyz_a0(:,i)) - 1;
+        pmax = max(xyz_a0(:,i)) + 1;
+        sz(i, 1) = pmin - (pmax - pmin)/2;
+        sz(i, 2) = pmax + (pmax - pmin)/2;
+    end	
+	
+	nmesh = 101;
+	xpts = linspace(sz(1, 1), sz(1, 2), nmesh);
+	ypts = linspace(sz(2, 1), sz(2, 2), nmesh);
+	zpts = linspace(sz(3, 1), sz(3, 2), nmesh);
+    
+	[X, Y, Z] = meshgrid(xpts, ypts, zpts);
 	
     % initialize volume data for isosurface
 	MOvals = zeros(size(X));
@@ -32,25 +49,39 @@ function moplot(atoms, xyz_a0, out, iMO, level)
         MOvals = MOvals + wave;
     end
     
+    % clear open figure if any
+    clf;
+    
     % positive isolevels
     possurf = patch(isosurface(X, Y, Z, MOvals, level));
     possurf.FaceColor = 'blue';
     possurf.EdgeColor = 'none';
-
+    possurf.FaceAlpha = 0.4;
+    
     hold on;
     % negative isolevels
     negsurf = patch(isosurface(X, Y, Z, MOvals, -level));
     negsurf.FaceColor = 'red';
     negsurf.EdgeColor = 'none';
+    negsurf.FaceAlpha = 0.4;
     
     % atom position spheres (not represtantive of actual atomic size)
     for k = 1:numel(atoms)
         [xatom, yatom, zatom] = sphere;
-        atmsurf = surf(0.1*xatom+xyz_a0(k,1), 0.1*yatom+xyz_a0(k,2), 0.1*zatom+xyz_a0(k,3));
+        scale = 0.1;
+        atmsurf = surf(scale*xatom+xyz_a0(k,1), scale*yatom+xyz_a0(k,2), scale*zatom+xyz_a0(k,3));
         atmsurf.EdgeColor = 'none';
-        atmsurf.FaceColor = [0.5, 0.5, 0.5];
+        w = find(color.indices == atoms(k));
+        if length(w) > 0
+			atmsurf.FaceColor = color.list(w);
+		else
+			atmsurf.FaceColor = [0.5, 0.5, 0.5];
+		end
     end
     view(3); camlight left; axis equal;
-    tt = sprintf('MO orbital %d, isolevel ± %.2f, bohr radius (a_{0})', iMO, level);
+    tt = sprintf('MO orbital %d, isolevel ± %.2f a_{0}^{-3/2}', iMO, level);
     title(tt)
+    xlabel('x ({a_0})');
+    ylabel('y ({a_0})');
+    zlabel('z ({a_0})');
 end
